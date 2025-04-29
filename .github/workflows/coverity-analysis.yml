@@ -41,7 +41,7 @@ jobs:
           Get-ChildItem -Directory | ForEach-Object {
             $CppFile = Get-ChildItem -Path $_.FullName -Filter *.cpp | Select-Object -First 1
             if ($CppFile) {
-               cov-analysis-win64-2024.6.1/bin/cov-build.exe --dir cov-int gcc -lstdc++ $CppFile.FullName -o '$($_.Name).exe' -or $true
+               cov-analysis-win64-2024.6.1/bin/cov-build.exe --dir cov-int g++ $CppFile.FullName -o '$($_.Name).exe' -or $true
             }
           }
       - name: Compress with bzip2
