@@ -12,7 +12,7 @@ on:
         default: "c-cpp"
 jobs:
   coverity:
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
     permissions:
       security-events: write
       packages: read
@@ -31,19 +31,22 @@ jobs:
           submodules: 'recursive'
       - name: Download and Install Coverity Tool
         run: |
-          wget https://scan.coverity.com/download/linux64 \
-            --post-data "token=${{ secrets.COVERITY_TOKEN }}&project=${{ github.repository }}" \
-            -O coverity_tool.tgz
-          mkdir coverity_tool
-          tar -xvzf coverity_tool.tgz -C coverity_tool --strip-components=1
-          export PATH=$PWD/coverity_tool/bin:$PATH
-          echo "Coverity Tool installed successfully"
+          Invoke-WebRequest -Uri "https://scan.coverity.com/download/win64" -Method Post -Body "token=${{ secrets.COVERITY_TOKEN }}&project=${{ github.repository }}" -OutFile "coverity_tool.zip"
+          New-Item -ItemType Directory -Path "coverity_tool" -Force | Out-Null
+          unzip coverity_tool.zip
+          $Env:PATH = "$PWD\coverity_tool\bin;$Env:PATH"
+          Write-Output "Coverity Tool installed successfully"
       - name: Build with Coverity
         run: |
-          coverity_tool/bin/cov-build --dir cov-int make || true
+          Get-ChildItem -Directory | ForEach-Object {
+            $CppFile = Get-ChildItem -Path $_.FullName -Filter *.cpp | Select-Object -First 1
+            if ($CppFile) {
+               cov-analysis-win64-2024.6.1/bin/cov-build.exe --dir cov-int gcc $CppFile.FullName -o '$($_.Name).exe'
+            }
+          }
       - name: Compress with bzip2
         run: |
-          tar cjvf myproject.tar.bz2 cov-int
+          Compress-Archive -Path cov-int -DestinationPath myproject.zip
         id: compress
       - name: Create GitHub Release
         id: create_release
@@ -62,9 +65,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myproject.tar.bz2
-          asset_name: myproject.tar.bz2
+          asset_path: myproject.zip
+          asset_name: myproject.zip
           asset_content_type: application/x-bzip2
       - name: Notify Coverity Scan
         run: |
-          curl --data "project=${{ github.repository }}&token=${{ secrets.COVERITY_TOKEN }}&email=cpp.benchmark@proton.me&url=https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.tar.bz2&version=1.0&description=Automated+Coverity+Scan" https://scan.coverity.com/builds
+          Invoke-WebRequest -Uri "https://scan.coverity.com/builds" -Method Post -Body @{
+            project     = "${{ github.repository }}"
+            token       = "${{ secrets.COVERITY_TOKEN }}"
+            email       = "cpp.benchmark@proton.me"
+            url         = "https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.zip"
+            version     = "1.0"
+            description = "Automated Coverity Scan"
+          }
