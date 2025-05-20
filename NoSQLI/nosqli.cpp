@@ -16,11 +16,11 @@ void runQuery(const std::string& rawJsonInput) {
   auto db = conn["testdb"];
   auto collection = db["users"];
 
-  //SINK
   bsoncxx::document::value query = bsoncxx::from_json(rawJsonInput);
-
+  
   std::cout << "Query: " << rawJsonInput << std::endl;
-
+  
+  //SINK
   auto result = collection.find_one(query.view());
   if (result) {
       std::cout << "[!] Authenticated as: " << bsoncxx::to_json(*result) << std::endl;

@@ -16,11 +16,11 @@ void runRoleAccessCheck(const std::string& jsonInput) {
     auto db = conn["testdb"];
     auto collection = db["users"];
 
-    //SINK
     bsoncxx::document::value filter = bsoncxx::from_json(jsonInput);
-
+    
     std::cout << "Query: " << jsonInput << std::endl;
-
+    
+    //SINK
     auto result = collection.find_one(filter.view());
     if (result) {
         std::cout << "[!] Access granted for: " << bsoncxx::to_json(*result) << std::endl;
