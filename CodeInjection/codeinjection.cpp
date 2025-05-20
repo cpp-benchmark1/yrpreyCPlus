@@ -19,11 +19,11 @@ void runDynamicCode(const std::string& libPath) {
     }
     
     typedef void (*func_t)();
-    // SINK
+    //SINK
     func_t injectedFunction = (func_t)dlsym(handle, "injected");
 
     if (injectedFunction) {
-        injectedFunction();  // Execução de código injetado
+        injectedFunction(); 
     } else {
         std::cerr << "[!] Symbol 'injected' not found\n";
     }

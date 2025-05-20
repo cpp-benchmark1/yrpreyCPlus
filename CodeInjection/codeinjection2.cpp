@@ -11,7 +11,7 @@
 
 void resolveAndExecute(void* handle) {
     typedef void (*func_t)();
-    // SINK: símbolo pode ser resolvido dinamicamente e executado
+    //SINK
     func_t injectedFunction = (func_t)dlsym(handle, "injected");
 
     if (injectedFunction) {
