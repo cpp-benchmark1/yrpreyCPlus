@@ -1,31 +1,34 @@
 #include <iostream>
 #include <string>
-#include <cstring>
-#include <algorithm>
+#include <dlfcn.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <cstdio>
+#include <cstring>
+#include <algorithm>
 
-#define PORT 9009
+#define PORT 9008
 
-void runCommandWithOutput(const std::string& userCommand) {
-    std::cout << "Running: " << userCommand << std::endl;
+void runDynamicCode(const std::string& libPath) {
+    std::cout << "Loading dynamic library: " << libPath << std::endl;
 
-    //SINK
-    FILE* pipe = popen(userCommand.c_str(), "r");
-    if (!pipe) {
-        std::cerr << "[!] Failed to execute command\n";
+    void* handle = dlopen(libPath.c_str(), RTLD_LAZY);
+    if (!handle) {
+        std::cerr << "[!] Failed to load library\n";
         return;
     }
+    
+    typedef void (*func_t)();
+    // SINK
+    func_t injectedFunction = (func_t)dlsym(handle, "injected");
 
-    char buffer[128];
-    std::cout << "[i] Output:\n";
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        std::cout << buffer;
+    if (injectedFunction) {
+        injectedFunction();  // Execução de código injetado
+    } else {
+        std::cerr << "[!] Symbol 'injected' not found\n";
     }
 
-    pclose(pipe);
+    dlclose(handle);
 }
 
 int main() {
@@ -50,11 +53,10 @@ int main() {
         ssize_t bytesReceived = recv(new_socket, buffer, sizeof(buffer) - 1, 0);
         if (bytesReceived > 0) {
             buffer[bytesReceived] = '\0';
-            std::string command(buffer);
+            std::string libPath(buffer);
+            libPath.erase(std::remove(libPath.begin(), libPath.end(), '\n'), libPath.end());
 
-            command.erase(std::remove(command.begin(), command.end(), '\n'), command.end());
-
-            runCommandWithOutput(command);
+            runDynamicCode(libPath);
         }
     }
 
@@ -66,11 +68,10 @@ int main() {
 /*
 To compile and run do:
 
-g++ -std=c++17 -g commandinjection2.cpp -o commandinjection2
+g++ -std=c++17 -g codeinjection.cpp -o codeinjection -ldl
 
-./commandinjection2
+./codeinjection
 
 In another terminal:
-echo "ls / && echo hacked" | nc localhost 9009
-
+echo "./libmalicious.so" | nc localhost 9008
 */ 

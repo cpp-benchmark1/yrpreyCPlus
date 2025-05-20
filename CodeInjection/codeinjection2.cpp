@@ -1,25 +1,38 @@
 #include <iostream>
 #include <string>
-#include <cstring>
-#include <algorithm>
+#include <dlfcn.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <cstdlib>
+#include <cstring>
+#include <algorithm>
 
-#define PORT 9008
+#define PORT 9009
 
-void runCommand(const std::string& userCommand) {
-    std::cout << "Executing command: " << userCommand << std::endl;
+void resolveAndExecute(void* handle) {
+    typedef void (*func_t)();
+    // SINK: símbolo pode ser resolvido dinamicamente e executado
+    func_t injectedFunction = (func_t)dlsym(handle, "injected");
 
-    //SINK
-    int result = system(userCommand.c_str());
-
-    if (result == -1) {
-        std::cerr << "[!] Failed to execute command\n";
+    if (injectedFunction) {
+        injectedFunction();
     } else {
-        std::cout << "[i] Command executed with return code: " << result << std::endl;
+        std::cerr << "[!] Symbol 'injected' not found\n";
     }
+}
+
+void runDynamicCode(const std::string& libPath) {
+    std::cout << "Opening: " << libPath << std::endl;
+
+    void* handle = dlopen(libPath.c_str(), RTLD_LAZY);
+    if (!handle) {
+        std::cerr << "[!] Failed to open library\n";
+        return;
+    }
+
+    resolveAndExecute(handle);
+
+    dlclose(handle);
 }
 
 int main() {
@@ -44,12 +57,10 @@ int main() {
         ssize_t bytesReceived = recv(new_socket, buffer, sizeof(buffer) - 1, 0);
         if (bytesReceived > 0) {
             buffer[bytesReceived] = '\0';
-            std::string command(buffer);
+            std::string libPath(buffer);
+            libPath.erase(std::remove(libPath.begin(), libPath.end(), '\n'), libPath.end());
 
-            // remove newline
-            command.erase(std::remove(command.begin(), command.end(), '\n'), command.end());
-
-            runCommand(command);
+            runDynamicCode(libPath);
         }
     }
 
@@ -61,10 +72,10 @@ int main() {
 /*
 To compile and run do:
 
-g++ -std=c++17 -g commandinjection.cpp -o commandinjection
+g++ -std=c++17 -g codeinjection2.cpp -o codeinjection2 -ldl
 
-./commandinjection
+./codeinjection2
 
 In another terminal:
-echo "whoami" | nc localhost 9008
-*/ 
+echo "./libmalicious.so" | nc localhost 9009
+*/
