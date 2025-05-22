@@ -21,11 +21,11 @@ void runQuery(const std::string& username, const std::string& password) {
 
     std::string query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "';";
 
-    //SINK
     int rc = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, nullptr);
-
+    
     std::cout << "Query: " << query << std::endl;
-
+    
+    //SINK
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         std::cout << "[!] Authenticated as: " << sqlite3_column_text(stmt, 0) << std::endl;
     } else {
