@@ -41,6 +41,12 @@ jobs:
       - name: Build with Coverity
         run: |
           find . -name '*.cpp' -execdir cov-build --dir cov-int g++ {} -o {}.out -lsqlite3 -lcurl \;
+      - name: List all .cpp files
+        run: find . -name '*.cpp'
+      - name: List files in workspace
+        run: ls -l
+      - name: List cov-int directory
+        run: ls -l cov-int || echo "cov-int not found"
       - name: Compress with bzip2
         run: |
           tar -cjf myproject.tar.bz2 cov-int
