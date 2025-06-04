@@ -81,14 +81,13 @@ jobs:
           asset_content_type: application/x-bzip2
       - name: Notify Coverity Scan
         run: |
-          Invoke-WebRequest -Uri "https://scan.coverity.com/builds" -Method Post -Body @{
-            project     = "${{ github.repository }}"
-            token       = "${{ secrets.COVERITY_TOKEN }}"
-            email       = "cpp.benchmark@proton.me"
-            url         = "https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.tar.bz2"
-            version     = "1.0"
-            description = "Automated Coverity Scan"
-          }
+          curl -X POST https://scan.coverity.com/builds \
+            -F "project=${{ github.repository }}" \
+            -F "token=${{ secrets.COVERITY_TOKEN }}" \
+            -F "email=cpp.benchmark@proton.me" \
+            -F "url=https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.tar.bz2" \
+            -F "version=1.0" \
+            -F "description=Automated Coverity Scan"
       - name: Install vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg.git
