@@ -36,14 +36,18 @@ jobs:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
     - if: matrix.build-mode == 'manual'
-      shell: pwsh
+      shell: bash
       run: |
-        Get-ChildItem -Directory | ForEach-Object {
-          $CppFile = Get-ChildItem -Path $_.FullName -Filter *.cpp | Select-Object -First 1
-          if ($CppFile) {
-            g++ $CppFile.FullName -o "$($_.Name).exe"
-          }
-        }
+        sudo apt-get update
+        sudo apt-get install -y libsqlite3-dev libcurl4-openssl-dev
+        find . -name '*.cpp' -print0 | while IFS= read -r -d "" file; do
+          g++ "$file" -o "${file}.out" -lsqlite3 -lcurl || true
+        done
+    - name: Install vcpkg and MongoDB C++ driver
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.sh
+        ./vcpkg/vcpkg install mongo-cxx-driver
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
