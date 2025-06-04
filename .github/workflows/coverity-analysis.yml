@@ -33,11 +33,17 @@ jobs:
         run: |
           curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
           tar -xzf coverity_tool.tgz
-          export PATH="$PWD/coverity_tool/bin:$PATH"
+          export PATH="$PWD/cov-analysis-linux64-*/bin:$PATH"
           echo "Coverity Tool installed successfully"
+      - name: Check cov-build version
+        run: cov-build --version
+      - name: List all .cpp files
+        run: find . -name '*.cpp'
       - name: Build with Coverity
         run: |
           find . -name '*.cpp' -execdir cov-build --dir cov-int g++ {} -o {}.out \;
+      - name: List cov-int directory
+        run: ls -l cov-int || echo "cov-int not found"
       - name: Compress with bzip2
         run: |
           tar -cjf myproject.tar.bz2 cov-int
