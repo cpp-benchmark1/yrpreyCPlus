@@ -47,6 +47,10 @@ jobs:
         run: ls -l
       - name: List cov-int directory
         run: ls -l cov-int || echo "cov-int not found"
+      - name: List Coverity directory
+        run: ls -l
+      - name: List Coverity bin directory
+        run: ls -l cov-analysis-linux64-*/bin
       - name: Compress with bzip2
         run: |
           tar -cjf myproject.tar.bz2 cov-int
@@ -89,3 +93,5 @@ jobs:
       - name: Install MongoDB C++ driver
         run: |
           ./vcpkg/vcpkg.exe install mongo-cxx-driver
+      - name: Check cov-build version
+        run: cov-build --version
