@@ -12,7 +12,7 @@ on:
         default: "c-cpp"
 jobs:
   coverity:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
@@ -29,21 +29,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ libsqlite3-dev libcurl4-openssl-dev
       - name: Download and Install Coverity Tool
         run: |
-          Invoke-WebRequest -Uri "https://scan.coverity.com/download/win64" -Method Post -Body "token=${{ secrets.COVERITY_TOKEN }}&project=${{ github.repository }}" -OutFile "coverity_tool.zip"
-          New-Item -ItemType Directory -Path "coverity_tool" -Force | Out-Null
-          unzip coverity_tool.zip
-          $Env:PATH = "$PWD\coverity_tool\bin;$Env:PATH"
-          Write-Output "Coverity Tool installed successfully"
+          curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
+          tar -xzf coverity_tool.tgz
+          export PATH="$PWD/cov-analysis-linux64-*/bin:$PATH"
       - name: Build with Coverity
         run: |
-          Get-ChildItem -Directory | ForEach-Object {
-            $CppFile = Get-ChildItem -Path $_.FullName -Filter *.cpp | Select-Object -First 1
-            if ($CppFile) {
-               cov-analysis-win64-2024.6.1/bin/cov-build.exe --dir cov-int g++ $CppFile.FullName -o '$($_.Name).exe'
-            }
-          }
+          find . -name '*.cpp' -execdir cov-build --dir cov-int g++ {} -o {}.out -lsqlite3 -lcurl \;
       - name: Compress with bzip2
         run: |
           Compress-Archive -Path cov-int -DestinationPath myproject.zip
@@ -78,3 +75,11 @@ jobs:
             version     = "1.0"
             description = "Automated Coverity Scan"
           }
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Install MongoDB C++ driver
+        run: |
+          ./vcpkg/vcpkg.exe install mongo-cxx-driver
