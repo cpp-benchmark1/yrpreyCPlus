@@ -40,7 +40,11 @@ jobs:
           export PATH="$PWD/cov-analysis-linux64-*/bin:$PATH"
       - name: Build with Coverity
         run: |
-          ./cov-analysis-linux64-*/bin/cov-build --dir cov-int bash -c 'for file in $(find . -name "*.cpp"); do g++ "$file" -o "${file}.out" -lsqlite3 -lcurl; done'
+          ./cov-analysis-linux64-*/bin/cov-build --dir cov-int bash -c '
+            find . -name "*.cpp" -print0 | while IFS= read -r -d "" file; do
+              g++ "$file" -o "${file}.out" -lsqlite3 -lcurl
+            done
+          '
       - name: List all .cpp files
         run: find . -name '*.cpp'
       - name: List files in workspace
