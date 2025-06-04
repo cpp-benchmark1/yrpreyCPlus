@@ -33,19 +33,14 @@ jobs:
         run: |
           curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
           tar -xzf coverity_tool.tgz
-          $Env:PATH = "$PWD\coverity_tool\bin;$Env:PATH"
-          Write-Output "Coverity Tool installed successfully"
+          export PATH="$PWD/coverity_tool/bin:$PATH"
+          echo "Coverity Tool installed successfully"
       - name: Build with Coverity
         run: |
-          Get-ChildItem -Directory | ForEach-Object {
-            $CppFile = Get-ChildItem -Path $_.FullName -Filter *.cpp | Select-Object -First 1
-            if ($CppFile) {
-               cov-analysis-win64-2024.6.1/bin/cov-build.exe --dir cov-int g++ $CppFile.FullName -o '$($_.Name).exe'
-            }
-          }
+          find . -name '*.cpp' -execdir cov-build --dir cov-int g++ {} -o {}.out \;
       - name: Compress with bzip2
         run: |
-          Compress-Archive -Path cov-int -DestinationPath myproject.zip
+          tar -cjf myproject.tar.bz2 cov-int
         id: compress
       - name: Create GitHub Release
         id: create_release
@@ -64,16 +59,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myproject.zip
-          asset_name: myproject.zip
+          asset_path: myproject.tar.bz2
+          asset_name: myproject.tar.bz2
           asset_content_type: application/x-bzip2
       - name: Notify Coverity Scan
         run: |
-          Invoke-WebRequest -Uri "https://scan.coverity.com/builds" -Method Post -Body @{
-            project     = "${{ github.repository }}"
-            token       = "${{ secrets.COVERITY_TOKEN }}"
-            email       = "cpp.benchmark@proton.me"
-            url         = "https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.zip"
-            version     = "1.0"
-            description = "Automated Coverity Scan"
-          }
+          curl -X POST https://scan.coverity.com/builds \
+            -F "project=${{ github.repository }}" \
+            -F "token=${{ secrets.COVERITY_TOKEN }}" \
+            -F "email=cpp.benchmark@proton.me" \
+            -F "url=https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.tar.bz2" \
+            -F "version=1.0" \
+            -F "description=Automated Coverity Scan"
