@@ -31,9 +31,8 @@ jobs:
           submodules: 'recursive'
       - name: Download and Install Coverity Tool
         run: |
-          Invoke-WebRequest -Uri "https://scan.coverity.com/download/win64" -Method Post -Body "token=${{ secrets.COVERITY_TOKEN }}&project=${{ github.repository }}" -OutFile "coverity_tool.zip"
-          New-Item -ItemType Directory -Path "coverity_tool" -Force | Out-Null
-          unzip coverity_tool.zip
+          curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
+          tar -xzf coverity_tool.tgz
           $Env:PATH = "$PWD\coverity_tool\bin;$Env:PATH"
           Write-Output "Coverity Tool installed successfully"
       - name: Build with Coverity
