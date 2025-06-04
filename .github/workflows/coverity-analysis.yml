@@ -43,7 +43,7 @@ jobs:
           find . -name '*.cpp' -execdir cov-build --dir cov-int g++ {} -o {}.out -lsqlite3 -lcurl \;
       - name: Compress with bzip2
         run: |
-          Compress-Archive -Path cov-int -DestinationPath myproject.zip
+          tar -cjf myproject.tar.bz2 cov-int
         id: compress
       - name: Create GitHub Release
         id: create_release
@@ -62,8 +62,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myproject.zip
-          asset_name: myproject.zip
+          asset_path: myproject.tar.bz2
+          asset_name: myproject.tar.bz2
           asset_content_type: application/x-bzip2
       - name: Notify Coverity Scan
         run: |
@@ -71,7 +71,7 @@ jobs:
             project     = "${{ github.repository }}"
             token       = "${{ secrets.COVERITY_TOKEN }}"
             email       = "cpp.benchmark@proton.me"
-            url         = "https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.zip"
+            url         = "https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.tar.bz2"
             version     = "1.0"
             description = "Automated Coverity Scan"
           }
