@@ -97,4 +97,4 @@ jobs:
         run: |
           ./vcpkg/vcpkg install mongo-cxx-driver
       - name: Check cov-build version
-        run: cov-build --version
+        run: ./cov-analysis-linux64-*/bin/cov-build --version
