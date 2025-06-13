@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <cstdlib>
-// #include <cctype>
+#include <cctype>
 #define PORT 9012
 
 int extractIndexFromList(const std::string& input) {

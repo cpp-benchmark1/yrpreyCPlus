@@ -35,7 +35,11 @@ jobs:
           sudo apt-get install -y g++ libsqlite3-dev libcurl4-openssl-dev
       - name: Download and Install Coverity Tool
         run: |
-          curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
+          curl -L --output coverity_tool.tgz \
+            --form "token=${{ secrets.COVERITY_TOKEN }}" \
+            --form "project=${{ github.repository }}" \
+            --form "version=2023.9.0" \
+            https://scan.coverity.com/download/linux64
           tar -xzf coverity_tool.tgz
           export PATH="$PWD/cov-analysis-linux64-*/bin:$PATH"
       - name: Build with Coverity
