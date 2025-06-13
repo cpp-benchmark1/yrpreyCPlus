@@ -33,10 +33,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y g++ libsqlite3-dev libcurl4-openssl-dev
-      - name: Download and Install Coverity Tool (manual)
+      - name: Download and Install Coverity Tool
         run: |
-          wget https://scan.coverity.com/download/cxx/linux64/2023.9.0 -O coverity_tool.tgz \
-            --header="Authorization: token ${{ secrets.COVERITY_TOKEN }}"
+          curl --silent --show-error --fail -L \
+            --output coverity_tool.tgz \
+            --form "token=${{ secrets.COVERITY_TOKEN }}" \
+            --form "project=${{ github.repository }}" \
+            --form "version=2023.9.0" \
+            https://scan.coverity.com/download/linux64
           tar -xzf coverity_tool.tgz
       - name: Build with Coverity
         run: |
