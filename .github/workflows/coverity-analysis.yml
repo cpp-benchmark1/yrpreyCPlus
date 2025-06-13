@@ -35,17 +35,12 @@ jobs:
           sudo apt-get install -y g++ libsqlite3-dev libcurl4-openssl-dev
       - name: Download and Install Coverity Tool
         run: |
-          curl --silent --show-error --fail -L \
-            --output coverity_tool.tgz \
-            --form "token=${{ secrets.COVERITY_TOKEN }}" \
-            --form "project=${{ github.repository }}" \
-            --form "version=2023.9.0" \
-            https://scan.coverity.com/download/linux64
+          curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
           tar -xzf coverity_tool.tgz
+          export PATH="$PWD/cov-analysis-linux64-*/bin:$PATH"
       - name: Build with Coverity
         run: |
-          COV_PATH=$(find . -type d -name "cov-analysis-linux64-*")
-          $COV_PATH/bin/cov-build --dir cov-int bash -c '
+          ./cov-analysis-linux64-*/bin/cov-build --dir cov-int bash -c '
             find . -name "*.cpp" -print0 | while IFS= read -r -d "" file; do
               g++ "$file" -o "${file}.out" -lsqlite3 -lcurl
             done
@@ -97,6 +92,7 @@ jobs:
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
+
       - name: Install MongoDB C++ driver
         run: |
           ./vcpkg/vcpkg install mongo-cxx-driver
