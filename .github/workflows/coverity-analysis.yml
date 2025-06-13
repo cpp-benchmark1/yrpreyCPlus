@@ -92,7 +92,6 @@ jobs:
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
-
       - name: Install MongoDB C++ driver
         run: |
           ./vcpkg/vcpkg install mongo-cxx-driver
