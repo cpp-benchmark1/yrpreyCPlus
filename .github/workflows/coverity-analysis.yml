@@ -34,119 +34,94 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            g++ \
-            libsqlite3-dev \
-            libcurl4-openssl-dev \
-            pkg-config \
-            cmake \
-            build-essential
+          sudo apt-get install -y g++ libsqlite3-dev libcurl4-openssl-dev build-essential cmake
 
-      - name: Install vcpkg and MongoDB dependencies
+      - name: Install vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Install MongoDB C++ driver
+        run: |
           ./vcpkg/vcpkg install mongo-cxx-driver
-          echo "CMAKE_TOOLCHAIN_FILE=$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $GITHUB_ENV
 
       - name: Download and Install Coverity Tool
         run: |
-          curl -L --output coverity_tool.tgz \
-            --form "token=${{ secrets.COVERITY_TOKEN }}" \
-            --form "project=${{ github.repository }}" \
-            https://scan.coverity.com/download/linux64
+          curl -L --output coverity_tool.tgz --form "token=${{ secrets.COVERITY_TOKEN }}" --form "project=${{ github.repository }}" https://scan.coverity.com/download/linux64
           tar -xzf coverity_tool.tgz
           export PATH="$PWD/cov-analysis-linux64-*/bin:$PATH"
-          echo "$PWD/cov-analysis-linux64-*/bin" >> $GITHUB_PATH
 
-      - name: Prepare build environment
+      - name: List all .cpp files to be analyzed
         run: |
-          # Create a list of files that can be compiled on Linux
-          find . -name "*.cpp" -type f > all_cpp_files.txt
-          
-          # Filter out files that won't compile on Linux
-          grep -v "windows.h" all_cpp_files.txt > buildable_files.txt || touch buildable_files.txt
-          
-          # Check if any files are left to build
-          if [ ! -s buildable_files.txt ]; then
-            echo "No buildable C++ files found for Linux"
-            echo "Creating a simple test file to ensure Coverity runs"
-            cat > test_file.cpp << 'EOF'
-          #include <iostream>
-          int main() {
-              std::cout << "Test file for Coverity scan" << std::endl;
-              return 0;
-          }
-          EOF
-            echo "./test_file.cpp" > buildable_files.txt
-          fi
+          echo "Files that will be analyzed:"
+          find . -name "*.cpp" -not -path "./cov-analysis-linux64-*/*" -not -path "./vcpkg/*"
 
       - name: Build with Coverity
         run: |
-          # Set up environment variables for vcpkg
+          export CMAKE_TOOLCHAIN_FILE=$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake
           export VCPKG_ROOT=$PWD/vcpkg
-          export CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
           
-          # Build with Coverity
-          cov-build --dir cov-int bash -c '
-            while IFS= read -r file; do
-              echo "Building: $file"
-              # Skip files that require Windows-specific headers
-              if grep -q "windows.h" "$file" 2>/dev/null; then
-                echo "Skipping Windows-specific file: $file"
+          ./cov-analysis-linux64-*/bin/cov-build --dir cov-int bash -c '
+            # Set include paths for MongoDB driver
+            MONGO_INCLUDE="-I$PWD/vcpkg/installed/x64-linux/include"
+            MONGO_LIB="-L$PWD/vcpkg/installed/x64-linux/lib -lbsoncxx -lmongocxx"
+            
+            find . -name "*.cpp" -not -path "./cov-analysis-linux64-*/*" -not -path "./vcpkg/*" -print0 | while IFS= read -r -d "" file; do
+              echo "Processing: $file"
+              
+              # Skip Windows-specific files on Linux
+              if [[ "$file" == *"bufferOverflow.cpp"* ]] || grep -q "windows.h" "$file" 2>/dev/null; then
+                echo "  -> Skipping Windows-specific file: $file"
                 continue
               fi
               
-              # Skip files that require MongoDB if vcpkg install failed
-              if grep -q "bsoncxx" "$file" 2>/dev/null; then
-                if ! pkg-config --exists libbsoncxx 2>/dev/null && [ ! -d "$VCPKG_ROOT/installed" ]; then
-                  echo "Skipping MongoDB file (dependencies not available): $file"
-                  continue
-                fi
-                # Try to compile with vcpkg paths
-                g++ "$file" -o "${file}.out" \
-                  -I"$VCPKG_ROOT/installed/x64-linux/include" \
-                  -L"$VCPKG_ROOT/installed/x64-linux/lib" \
-                  -lbsoncxx -lmongocxx -lsqlite3 -lcurl 2>/dev/null || {
-                  echo "Failed to compile MongoDB file: $file"
+              # Compile with appropriate libraries based on file content
+              if grep -q "bsoncxx\|mongocxx" "$file" 2>/dev/null; then
+                echo "  -> Compiling MongoDB file with MongoDB libraries"
+                g++ "$file" -o "${file}.out" $MONGO_INCLUDE $MONGO_LIB -lsqlite3 -lcurl -std=c++17 2>/dev/null || {
+                  echo "  -> Failed to compile MongoDB file: $file"
                   continue
                 }
               else
-                # Regular compilation
-                g++ "$file" -o "${file}.out" -lsqlite3 -lcurl 2>/dev/null || {
-                  echo "Failed to compile: $file"
+                echo "  -> Compiling standard C++ file"
+                g++ "$file" -o "${file}.out" -lsqlite3 -lcurl -std=c++17 2>/dev/null || {
+                  echo "  -> Failed to compile: $file"
                   continue
                 }
               fi
-              echo "Successfully compiled: $file"
-            done < buildable_files.txt
+              
+              echo "  -> Successfully compiled: $file"
+            done
+            
+            echo "Build process completed"
           '
 
-      - name: Check Coverity results
+      - name: Verify Coverity analysis
         run: |
-          echo "Checking cov-int directory..."
+          echo "Checking cov-int directory:"
           ls -la cov-int/ || echo "cov-int directory not found"
           
-          if [ -d "cov-int" ]; then
-            echo "Build log contents:"
-            cat cov-int/build-log.txt 2>/dev/null || echo "No build log found"
-            
-            echo "Emit directory contents:"
-            ls -la cov-int/emit/ 2>/dev/null || echo "No emit directory found"
+          echo "Checking for analysis results:"
+          if [ -f "cov-int/build-log.txt" ]; then
+            echo "Build log exists, showing last 50 lines:"
+            tail -50 cov-int/build-log.txt
+          else
+            echo "Build log not found"
           fi
 
-      - name: List compilation results
+      - name: List files in workspace
         run: |
-          echo "=== All .cpp files found ==="
-          find . -name '*.cpp' -type f
-          echo "=== Generated .out files ==="
-          find . -name '*.out' -type f 2>/dev/null || echo "No .out files generated"
+          echo "Workspace contents:"
+          ls -la
+          echo "Generated executables:"
+          find . -name "*.out" -type f 2>/dev/null || echo "No .out files found"
 
-      - name: Compress results
+      - name: Compress results with bzip2
         run: |
-          if [ -d "cov-int" ] && [ "$(ls -A cov-int 2>/dev/null)" ]; then
+          if [ -d "cov-int" ] && [ "$(ls -A cov-int)" ]; then
+            echo "Compressing Coverity results..."
             tar -cjf myproject.tar.bz2 cov-int
-            echo "Successfully created myproject.tar.bz2"
+            echo "Compression completed. File size:"
             ls -lh myproject.tar.bz2
           else
             echo "Error: cov-int directory is empty or doesn't exist"
@@ -161,8 +136,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: "coverity-scan-${{ github.run_id }}"
-          release_name: "Coverity Scan Results"
-          body: "Automated Coverity Scan Results"
+          release_name: "Coverity Scan Results - ${{ github.run_id }}"
+          body: |
+            Automated Coverity Scan Results
+            
+            **Run Details:**
+            - Commit: ${{ github.sha }}
+            - Branch: ${{ github.ref_name }}
+            - Trigger: ${{ github.event_name }}
+            - Run ID: ${{ github.run_id }}
+            
+            This release contains the Coverity Scan analysis results for static code analysis.
           draft: false
           prerelease: false
 
@@ -178,10 +162,23 @@ jobs:
 
       - name: Notify Coverity Scan
         run: |
+          echo "Submitting results to Coverity Scan service..."
           curl -X POST https://scan.coverity.com/builds \
             -F "project=${{ github.repository }}" \
             -F "token=${{ secrets.COVERITY_TOKEN }}" \
             -F "email=cpp.benchmark@proton.me" \
             -F "url=https://github.com/${{ github.repository }}/releases/download/coverity-scan-${{ github.run_id }}/myproject.tar.bz2" \
-            -F "version=1.0" \
-            -F "description=Automated Coverity Scan"
+            -F "version=${{ github.sha }}" \
+            -F "description=Automated Coverity Scan - Run ${{ github.run_id }}" || {
+              echo "Failed to submit to Coverity Scan service"
+              exit 1
+            }
+          echo "Successfully submitted to Coverity Scan service"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up temporary files..."
+          rm -f coverity_tool.tgz
+          rm -f *.out 2>/dev/null || true
+          echo "Cleanup completed"
