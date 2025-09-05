@@ -10,7 +10,7 @@ int main() {
     char configBuffer[128];
     
     std::cout << "Enter configuration data: ";
-    
+    // SINK CWE 242
     char* result = gets(configBuffer);
     
     if (result == nullptr) {

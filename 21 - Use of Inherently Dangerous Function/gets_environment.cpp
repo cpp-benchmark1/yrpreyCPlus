@@ -9,7 +9,7 @@ int main() {
     char dataBuffer[64];
     
     std::cout << "Enter data to set as environment variable: ";
-    
+    // SINK CWE 242
     char* result = gets(dataBuffer);
     
     if (result == nullptr) {
