@@ -27,7 +27,7 @@ void writeConfigurationData(const std::string& data) {
     
     const char* configPath = "/etc/ssh/ssh_config";
     
-    // Open file with insecure permissions
+    // SINK CWE 732
     int fd = open(configPath, O_CREAT | O_WRONLY | O_TRUNC, 0666);
     if (fd == -1) {
         std::cout << "Failed to create SSH config file" << std::endl;
